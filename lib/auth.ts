@@ -25,6 +25,6 @@ export async function requireRole(role: "ADMIN" | "STAFF") {
 }
 
 export async function findUser(email: string) {
-  const [rows] = await pool.query("SELECT user_id, full_name, password_hash, role_name FROM v_user_roles WHERE email = ? AND status = 'ACTIVE'", [email]);
-  return (rows as Array<{user_id:number; full_name:string; password_hash:string; role_name:"ADMIN"|"STAFF"}>)[0] ?? null;
+  const [rows] = await pool.query("SELECT user_id, full_name, email, password_hash, role_name FROM v_user_roles WHERE email = ? AND status = 'ACTIVE'", [email]);
+  return (rows as Array<{user_id:number; full_name:string; email:string; password_hash:string; role_name:"ADMIN"|"STAFF"}>)[0] ?? null;
 }

@@ -1,0 +1,5 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+export default function Login() { const [error,setError]=useState(""); const router=useRouter(); async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault(); const data=Object.fromEntries(new FormData(e.currentTarget)); const r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}); if(!r.ok){setError("Invalid credentials");return} router.push("/"); router.refresh();} return <div className="two"><section><div className="label">Restricted workspace</div><h1>Sign in to the case desk</h1><p>Use an approved staff or administrator account. Passwords are verified against bcrypt hashes and never stored in the browser.</p></section><section className="card"><form onSubmit={submit}><label>Email<input name="email" type="email" required /></label><label>Password<input name="password" type="password" required /></label>{error&&<div className="error">{error}</div>}<button className="button primary" type="submit">Sign in</button></form></section></div> }

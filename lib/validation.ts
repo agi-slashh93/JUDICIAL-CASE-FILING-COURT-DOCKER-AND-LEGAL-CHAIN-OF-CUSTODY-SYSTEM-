@@ -18,3 +18,13 @@ export const evidenceSchema = z.object({
   seized_date: z.string().date().optional().nullable(),
   current_location: z.string().trim().max(150).optional().nullable()
 });
+
+export const accusedSchema = z.object({
+  accused_full_name: z.string().trim().min(2).max(150),
+  accused_identity_number: z.string().trim().max(100).optional().nullable(),
+  accused_nationality: z.string().trim().max(80).optional().nullable(),
+  accused_address: z.string().trim().max(500).optional().nullable(),
+  accused_age: z.coerce.number().int().min(0).max(130).optional().nullable(),
+  accused_gender: z.string().trim().max(30).optional().nullable(),
+  accused_phone: z.string().trim().max(20).optional().nullable()
+});

@@ -59,6 +59,24 @@ CREATE TABLE `case` (
   CONSTRAINT chk_case_filing_date CHECK (filing_date >= '1900-01-01')
 );
 
+CREATE TABLE accused_person (
+  accused_id INT AUTO_INCREMENT PRIMARY KEY,
+  case_id INT NOT NULL,
+  full_name VARCHAR(150) NOT NULL,
+  identity_number VARCHAR(100),
+  nationality VARCHAR(80),
+  address VARCHAR(500),
+  age TINYINT UNSIGNED,
+  gender VARCHAR(30),
+  phone VARCHAR(20),
+  photo_path_url VARCHAR(500),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_accused_case FOREIGN KEY (case_id) REFERENCES `case`(case_id) ON DELETE CASCADE,
+  CONSTRAINT chk_accused_age CHECK (age IS NULL OR age BETWEEN 0 AND 130),
+  INDEX idx_accused_case (case_id),
+  INDEX idx_accused_identity (identity_number)
+);
+
 CREATE TABLE document (
   document_id INT AUTO_INCREMENT PRIMARY KEY,
   case_id INT NOT NULL,

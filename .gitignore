@@ -5,3 +5,5 @@ coverage/
 *.log
 storage/evidence/*
 !storage/evidence/.gitkeep
+storage/accused/*
+!storage/accused/.gitkeep

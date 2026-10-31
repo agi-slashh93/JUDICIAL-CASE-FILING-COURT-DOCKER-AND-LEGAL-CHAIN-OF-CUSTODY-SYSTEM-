@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { pool } from "@/lib/mysql";
 import type { CaseSummary } from "@/lib/types";
+import CaseActions from "@/components/CaseActions";
 
-export default async function SolvedCases(){
-  const [rows]=await pool.query("SELECT * FROM v_case_dashboard WHERE status='CLOSED' ORDER BY filing_date DESC");
-  const cases=rows as CaseSummary[];
-  return <section className="card"><div className="topbar"><div><div className="label">Completed matters · SQL view</div><h1>Solved cases</h1></div><div><Link className="button" href="/cases">All cases</Link> <Link className="button primary" href="/cases/new">File a case</Link></div></div>{cases.length===0?<p>No solved cases are available yet. Close a case by setting its status to CLOSED.</p>:<table><thead><tr><th>Case</th><th>Title</th><th>Court</th><th>Filed</th><th>Documents</th><th>Evidence</th></tr></thead><tbody>{cases.map(c=><tr key={c.case_id}><td><Link href={`/cases/${c.case_id}`}>{c.case_number}</Link></td><td>{c.title}</td><td>{c.court_name}</td><td>{new Date(c.filing_date).toLocaleDateString("en-IN")}</td><td>{c.document_count}</td><td>{c.evidence_count}</td></tr>)}</tbody></table>}</section>;
-}
+export default async function SolvedCases(){const [rows]=await pool.query("SELECT * FROM v_case_dashboard WHERE status='CLOSED' ORDER BY filing_date DESC");const cases=rows as CaseSummary[];return <section className="card"><div className="topbar"><div><div className="label">Completed matters · SQL view</div><h1>Solved cases</h1></div><div><Link className="button" href="/cases">All cases</Link> <Link className="button primary" href="/cases/new">File a case</Link></div></div>{cases.length===0?<p>No solved cases are available yet. Close a case by changing its status to CLOSED from the cases list.</p>:<table><thead><tr><th>Case</th><th>Title</th><th>Court</th><th>Filed</th><th>Documents</th><th>Evidence</th><th>Actions</th></tr></thead><tbody>{cases.map(c=><tr key={c.case_id}><td><Link href={`/cases/${c.case_id}`}>{c.case_number}</Link></td><td>{c.title}</td><td>{c.court_name}</td><td>{new Date(c.filing_date).toLocaleDateString("en-IN")}</td><td>{c.document_count}</td><td>{c.evidence_count}</td><td><CaseActions caseId={c.case_id} status={c.status}/></td></tr>)}</tbody></table>}</section>}

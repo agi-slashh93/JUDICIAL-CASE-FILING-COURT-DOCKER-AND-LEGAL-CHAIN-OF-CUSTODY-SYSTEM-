@@ -94,6 +94,7 @@ CREATE TABLE evidence (
   seized_from VARCHAR(150),
   seized_date DATE,
   current_location VARCHAR(150),
+  file_path_url VARCHAR(500),
   status VARCHAR(30) NOT NULL DEFAULT 'IN_CUSTODY',
   CONSTRAINT fk_evidence_case FOREIGN KEY (case_id) REFERENCES `case`(case_id) ON DELETE CASCADE,
   CONSTRAINT chk_evidence_status CHECK (status IN ('IN_CUSTODY','RELEASED','DESTROYED','ADMITTED'))

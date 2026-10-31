@@ -48,6 +48,11 @@ Browser -> Next.js pages/components -> Route Handlers -> MySQL (system of record
 
 Run `npm test` for validation tests. Demonstrate the dashboard, create a case, register evidence, show the automatically inserted initial `chain_log` row, call `CALL sp_transfer_evidence(...)`, run `03_queries.sql`, and show the MongoDB `audit_events` collection. Capture those screens for the final presentation/report.
 
-## Team responsibilities
+## Team contributions
 
-Agilesh R (PES2UG24CS385): SQL schema, constraints, custody procedure/trigger, API integration. Rajath N Gonda (PES2UG24CS394): Next.js UI, validation, authentication, MongoDB audit model, test cases and documentation. Both members should commit their work separately in GitHub to demonstrate individual contribution.
+| Contributor | Student ID | Deliverables |
+|---|---|---|
+| Agilesh R | PES2UG24CS385 | MySQL schema and constraints (`db/mysql/01_schema.sql`), seed and demonstration queries (`db/mysql/02_seed.sql`, `db/mysql/03_queries.sql`), custody procedure and trigger, and SQL/API integration. |
+| Rajath N Gonda | PES2UG24CS394 | Next.js interface (`app/`), authentication and session handling (`lib/auth.ts`, `app/api/auth/`), request validation (`lib/validation.ts` and `app/api/`), MongoDB audit model (`lib/mongo.ts`, `db/mongo/`), validation tests (`tests/`), and project documentation. |
+
+Keep each member's work in commits authored by that member so the Git history records both contributions. The files above identify each person's project area; a responsibility listing is not a substitute for accurate commit authorship.

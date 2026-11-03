@@ -10,6 +10,11 @@ Team 16 mini project implementation based on the supplied ER diagram, relational
 - API-layer validation with Zod, bcrypt password verification, signed HTTP-only session cookies, and environment-based configuration.
 - Seed data, demonstration queries, unit tests, and a requirements mapping below.
 
+Database design artifacts:
+
+- [ER diagram](docs/er-diagram.md)
+- [Relational schema](docs/relational-schema.md)
+
 ## Setup
 
 1. Install Node.js 20+, MySQL 8+, and MongoDB 7+.

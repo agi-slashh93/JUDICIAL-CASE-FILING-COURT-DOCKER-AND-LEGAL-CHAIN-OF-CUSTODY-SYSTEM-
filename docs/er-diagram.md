@@ -12,6 +12,9 @@ erDiagram
     CASE ||--o{ DOCUMENT : contains
     USER ||--o{ DOCUMENT : uploads
     CASE ||--o{ HEARING : schedules
+    CASE ||--o{ DOCKET_ENTRY : records
+    HEARING o|--o{ DOCKET_ENTRY : relates_to
+    USER ||--o{ DOCKET_ENTRY : enters
     CASE ||--o{ EVIDENCE : registers
     EVIDENCE ||--o{ CHAIN_LOG : records
     USER ||--o{ CHAIN_LOG : handles
@@ -90,6 +93,16 @@ erDiagram
         varchar status
         date next_hearing_date
     }
+    DOCKET_ENTRY {
+        int docket_entry_id PK
+        int case_id FK
+        int hearing_id FK
+        int entered_by FK
+        varchar entry_type
+        varchar title
+        text entry_text
+        datetime filed_at
+    }
     EVIDENCE {
         int evidence_id PK
         int case_id FK
@@ -126,8 +139,11 @@ erDiagram
 | `case` | `document` | 1 : many | `document.case_id` |
 | `user` | `document` | 1 : many | `document.uploaded_by` |
 | `case` | `hearing` | 1 : many | `hearing.case_id` |
+| `case` | `docket_entry` | 1 : many | `docket_entry.case_id` |
+| `hearing` | `docket_entry` | 1 : many (optional on entry) | `docket_entry.hearing_id` |
+| `user` | `docket_entry` | 1 : many | `docket_entry.entered_by` |
 | `case` | `evidence` | 1 : many | `evidence.case_id` |
 | `evidence` | `chain_log` | 1 : many | `chain_log.evidence_id` |
 | `user` | `chain_log` | 1 : many | `chain_log.handled_by` |
 
-The `case` table is the central entity. Deleting a case cascades to its accused records, documents, hearings, evidence, and chain-of-custody logs according to the schema constraints.
+The `case` table is the central entity. Deleting a case cascades to its accused records, documents, hearings, docket entries, evidence, and chain-of-custody logs according to the schema constraints.

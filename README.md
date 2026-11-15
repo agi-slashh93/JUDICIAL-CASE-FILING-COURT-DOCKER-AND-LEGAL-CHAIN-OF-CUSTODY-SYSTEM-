@@ -5,7 +5,7 @@ Team 16 mini project implementation based on the supplied ER diagram, relational
 ## What is included
 
 - Next.js App Router interface with dashboard, case intake, evidence registration, and role-aware session UI.
-- MySQL 8 normalized transactional schema with primary/foreign keys, checks, indexes, a full-text index, views, a trigger, and a transaction-backed stored procedure.
+- MySQL 8 normalized transactional schema with primary/foreign keys, checks, indexes, a full-text index, views, a trigger, and a transaction-backed stored procedure. The case docket records filings, orders, proceedings, and other events.
 - MongoDB collection model for unstructured audit events and case notes, with indexes and text retrieval.
 - API-layer validation with Zod, bcrypt password verification, signed HTTP-only session cookies, and environment-based configuration.
 - Seed data, demonstration queries, unit tests, and a requirements mapping below.
@@ -33,7 +33,7 @@ The seed accounts are `admin@example.com` and `staff@example.com`; set their pas
 | Meaningful non-CRUD domain | Court docket, hearings, document filing, and legal chain of custody |
 | SQL database | MySQL 8 in `db/mysql` |
 | Second paradigm | MongoDB audit events and case notes in `db/mongo` |
-| ER and relational design | Preserved from the supplied PDF and implemented as nine related tables |
+| ER and relational design | Relational schema and ER diagram in `docs/`; implemented as eleven related tables |
 | DDL | CREATE, ALTER, DROP, keys, constraints, indexes, views, trigger and procedure |
 | DML | API INSERTs plus JOIN, GROUP BY, HAVING, ORDER BY, aggregates, subqueries and full-text search in `03_queries.sql` |
 | Four advanced concepts | Transaction, view, stored procedure, trigger, indexing, full-text search and Mongo text index |

@@ -2,7 +2,7 @@ CREATE DATABASE IF NOT EXISTS judicial_case_system CHARACTER SET utf8mb4 COLLATE
 USE judicial_case_system;
 
 DROP VIEW IF EXISTS v_case_dashboard, v_user_roles;
-DROP TABLE IF EXISTS chain_log, evidence, hearing, document, `case`, judge, court, `user`, role;
+DROP TABLE IF EXISTS chain_log, evidence, docket_entry, hearing, document, `case`, judge, court, `user`, role;
 
 CREATE TABLE role (
   role_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -101,6 +101,22 @@ CREATE TABLE hearing (
   next_hearing_date DATE,
   CONSTRAINT fk_hearing_case FOREIGN KEY (case_id) REFERENCES `case`(case_id) ON DELETE CASCADE,
   CONSTRAINT chk_hearing_status CHECK (status IN ('SCHEDULED','COMPLETED','ADJOURNED','CANCELLED'))
+);
+
+-- Each filing, order, proceeding, or other case event appears on the docket.
+CREATE TABLE docket_entry (
+  docket_entry_id INT AUTO_INCREMENT PRIMARY KEY,
+  case_id INT NOT NULL,
+  hearing_id INT,
+  entered_by INT NOT NULL,
+  entry_type VARCHAR(50) NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  entry_text TEXT,
+  filed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_docket_case FOREIGN KEY (case_id) REFERENCES `case`(case_id) ON DELETE CASCADE,
+  CONSTRAINT fk_docket_hearing FOREIGN KEY (hearing_id) REFERENCES hearing(hearing_id) ON DELETE SET NULL,
+  CONSTRAINT fk_docket_user FOREIGN KEY (entered_by) REFERENCES `user`(user_id),
+  INDEX idx_docket_case_time (case_id, filed_at)
 );
 
 CREATE TABLE evidence (

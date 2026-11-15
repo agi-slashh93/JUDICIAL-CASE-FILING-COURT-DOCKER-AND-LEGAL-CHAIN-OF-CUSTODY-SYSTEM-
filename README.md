@@ -14,6 +14,7 @@ Database design artifacts:
 
 - [ER diagram](docs/er-diagram.md)
 - [Relational schema](docs/relational-schema.md)
+- [Complete project workflow notes](docs/project-workflow-notes.md)
 
 ## Setup
 

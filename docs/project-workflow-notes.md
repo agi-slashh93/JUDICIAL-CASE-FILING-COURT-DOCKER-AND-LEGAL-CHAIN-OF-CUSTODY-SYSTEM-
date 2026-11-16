@@ -415,3 +415,546 @@ The SQL schema includes `document`, `hearing`, and judge-related data for the co
 | `components/CaseActions.tsx` | Status and delete controls |
 | `docs/er-diagram.md` | ER diagram |
 | `docs/relational-schema.md` | Relational schema explanation |
+
+## 20. Databases used in the project
+
+### MySQL 8 — relational database
+
+MySQL is the primary database. It stores the data that must be structured, validated, joined, and updated transactionally:
+
+- Users and roles.
+- Courts and judges.
+- Court cases.
+- Accused-person identity data.
+- Documents.
+- Hearings.
+- Docket entries.
+- Evidence metadata.
+- Chain-of-custody events.
+
+The local database connection is configured through `.env`:
+
+```text
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_DATABASE=judicial_case_system
+MYSQL_USER=case_app
+MYSQL_PASSWORD=change_me
+```
+
+The physical MySQL data files are stored by the MySQL installation under:
+
+```text
+C:\ProgramData\MySQL\MySQL Server 8.0\Data
+```
+
+The application connects using the `mysql2/promise` connection pool in `lib/mysql.ts`. A pool is used instead of opening a new database connection for every request.
+
+### MongoDB — document database
+
+MongoDB is the second database paradigm. It stores flexible and append-only information:
+
+- `audit_events`: login, case creation, evidence registration, case status changes, and case deletion.
+- `case_notes`: future or flexible case notes with title, body, tags, and timestamps.
+
+The local MongoDB configuration is:
+
+```text
+MONGODB_URI=mongodb://127.0.0.1:27017
+MONGODB_DATABASE=judicial_case_system
+```
+
+MongoDB files are stored under the installed MongoDB data directory, while the project setup scripts are in `db/mongo`.
+
+The application writes audit events through `lib/mongo.ts`. Every event contains an event type, actor, optional case reference, payload, and `createdAt` timestamp.
+
+### File storage
+
+Files are not stored directly inside MySQL or MongoDB:
+
+- Accused photographs: `storage/accused`.
+- Audio/video evidence: `storage/evidence`.
+
+The SQL tables store generated filenames in `photo_path_url` and `file_path_url`. Protected Next.js routes serve those files.
+
+## 21. Complete MySQL DDL explanation
+
+DDL means Data Definition Language. It defines and changes database structures. This project uses the following DDL operations in `db/mysql/01_schema.sql`.
+
+### Database creation and selection
+
+```sql
+CREATE DATABASE IF NOT EXISTS judicial_case_system
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
+
+USE judicial_case_system;
+```
+
+`utf8mb4` supports international text, and the `0900_ai_ci` collation provides case-insensitive comparisons suitable for names and titles.
+
+### Safe recreation during development
+
+```sql
+DROP VIEW IF EXISTS v_case_dashboard, v_user_roles;
+DROP TABLE IF EXISTS chain_log, evidence, docket_entry, hearing,
+  document, `case`, judge, court, `user`, role;
+```
+
+This makes the schema script repeatable during development. It should not be executed on a production database containing important records because it removes the tables and data.
+
+### Table creation
+
+The project creates eleven normalized tables:
+
+1. `role` — administrator and staff role definitions.
+2. `user` — authenticated personnel.
+3. `court` — court information.
+4. `judge` — judges assigned to courts.
+5. `case` — central case record.
+6. `accused_person` — accused identity and photo reference.
+7. `document` — case documents and metadata.
+8. `hearing` — scheduled court hearings.
+9. `docket_entry` — filings, orders, proceedings, and case events.
+10. `evidence` — evidence metadata and current location.
+11. `chain_log` — immutable custody movement history.
+
+### Keys and constraints
+
+The schema demonstrates:
+
+- `PRIMARY KEY`: unique row identity, for example `case_id`.
+- `AUTO_INCREMENT`: generates numeric identifiers.
+- `UNIQUE`: prevents duplicates, for example case numbers, emails, court names, and evidence codes.
+- `NOT NULL`: requires important values.
+- `DEFAULT`: supplies values such as `OPEN`, `ACTIVE`, and current timestamps.
+- `FOREIGN KEY`: preserves relationships between tables.
+- `CHECK`: restricts legal domain values.
+- `ON DELETE CASCADE`: removes dependent case records when a case is deleted.
+- `ON DELETE SET NULL`: keeps a docket entry if its optional hearing is removed.
+
+Examples of domain checks:
+
+```sql
+CHECK (role_name IN ('ADMIN','STAFF'))
+CHECK (status IN ('OPEN','IN_PROGRESS','CLOSED','ARCHIVED'))
+CHECK (age IS NULL OR age BETWEEN 0 AND 130)
+CHECK (status IN ('IN_CUSTODY','RELEASED','DESTROYED','ADMITTED'))
+```
+
+### `ALTER TABLE`
+
+The schema adds a full-text index after creating the document table:
+
+```sql
+ALTER TABLE document
+  ADD FULLTEXT INDEX ft_document_text (title, description);
+```
+
+This permits keyword search over document metadata.
+
+### Indexes
+
+```sql
+CREATE INDEX idx_case_status_filing
+  ON `case` (status, filing_date);
+
+CREATE INDEX idx_evidence_case_status
+  ON evidence (case_id, status);
+
+CREATE INDEX idx_chain_evidence_time
+  ON chain_log (evidence_id, action_date_time DESC);
+
+CREATE INDEX idx_hearing_date_status
+  ON hearing (hearing_date, status);
+```
+
+Indexes improve common filters and sorting. For example, the solved-cases page filters by `status`, and custody history is normally displayed by evidence and time.
+
+### Views
+
+The user-role view joins users and roles for authentication:
+
+```sql
+CREATE OR REPLACE VIEW v_user_roles AS
+SELECT u.user_id, u.full_name, u.email, u.password_hash,
+       u.status, r.role_name
+FROM `user` u
+JOIN role r ON r.role_id = u.role_id;
+```
+
+The dashboard view combines case, court, document, evidence, and hearing information:
+
+```sql
+CREATE OR REPLACE VIEW v_case_dashboard AS
+SELECT c.case_id, c.case_number, c.title, c.case_type,
+       c.filing_date, c.status, co.court_name,
+       COUNT(DISTINCT d.document_id) AS document_count,
+       COUNT(DISTINCT e.evidence_id) AS evidence_count,
+       MIN(h.next_hearing_date) AS next_hearing_date
+FROM `case` c
+LEFT JOIN court co ON co.court_id = c.court_id
+LEFT JOIN document d ON d.case_id = c.case_id
+LEFT JOIN evidence e ON e.case_id = c.case_id
+LEFT JOIN hearing h ON h.case_id = c.case_id
+                    AND h.status = 'SCHEDULED'
+GROUP BY c.case_id, c.case_number, c.title, c.case_type,
+         c.filing_date, c.status, co.court_name;
+```
+
+The view prevents every page from repeating the same joins and aggregation logic.
+
+### Trigger
+
+The trigger automatically records the first custody event:
+
+```sql
+CREATE TRIGGER trg_evidence_initial_chain
+AFTER INSERT ON evidence
+FOR EACH ROW
+BEGIN
+  INSERT INTO chain_log
+    (evidence_id, handled_by, to_location, action, remarks)
+  VALUES
+    (NEW.evidence_id,
+     (SELECT filed_by FROM `case` WHERE case_id = NEW.case_id),
+     COALESCE(NEW.current_location, 'UNSPECIFIED'),
+     'REGISTERED',
+     'Initial chain-of-custody event');
+END;
+```
+
+This guarantees that every newly registered evidence item begins with a custody history entry, even if the application code does not separately insert one.
+
+### Stored procedure and transaction
+
+```sql
+CREATE PROCEDURE sp_transfer_evidence(
+  IN p_evidence_id INT,
+  IN p_user_id INT,
+  IN p_to_location VARCHAR(150),
+  IN p_remarks TEXT
+)
+BEGIN
+  DECLARE old_location VARCHAR(150);
+  START TRANSACTION;
+  SELECT current_location INTO old_location
+  FROM evidence
+  WHERE evidence_id = p_evidence_id
+  FOR UPDATE;
+  IF old_location IS NULL THEN
+    SET old_location = 'UNSPECIFIED';
+  END IF;
+  UPDATE evidence
+  SET current_location = p_to_location
+  WHERE evidence_id = p_evidence_id;
+  INSERT INTO chain_log
+    (evidence_id, handled_by, from_location, to_location, action, remarks)
+  VALUES
+    (p_evidence_id, p_user_id, old_location, p_to_location,
+     'TRANSFERRED', p_remarks);
+  COMMIT;
+END;
+```
+
+The transaction makes the location update and history insert one atomic operation. `FOR UPDATE` locks the selected evidence row while the transfer is being processed.
+
+## 22. Complete MySQL DML explanation
+
+DML means Data Manipulation Language. It inserts, reads, updates, and deletes records.
+
+### Insert seed data
+
+The seed file inserts roles:
+
+```sql
+INSERT INTO role(role_name, description)
+VALUES
+  ('ADMIN', 'Full case and user administration'),
+  ('STAFF', 'Case, evidence and hearing operations');
+```
+
+It inserts a court:
+
+```sql
+INSERT INTO court(court_name, court_type, address, location)
+VALUES
+  ('PES District Court', 'District',
+   'Bangalore District Complex', 'Bengaluru');
+```
+
+It inserts users and obtains the role ID through a subquery:
+
+```sql
+INSERT INTO `user`
+  (full_name, email, password_hash, phone, role_id)
+VALUES
+  ('System Administrator', 'admin@example.com',
+   '<bcrypt hash>', '0000000000',
+   (SELECT role_id FROM role WHERE role_name = 'ADMIN'));
+```
+
+It inserts the demonstration case, hearing, and evidence. Inserting evidence also invokes the custody trigger.
+
+### Application inserts
+
+The web API performs parameterized inserts rather than building SQL with string concatenation:
+
+- Case API inserts a row into `case`.
+- Case API inserts a row into `accused_person`.
+- Evidence API inserts a row into `evidence`.
+- The trigger inserts the first `chain_log` row.
+
+The case and accused inserts occur inside a transaction, so a case cannot be committed without its required accused record and photo reference.
+
+### Application updates
+
+The status control sends a `PATCH` request, which executes:
+
+```sql
+UPDATE `case`
+SET status = ?
+WHERE case_id = ?;
+```
+
+The stored procedure updates evidence location and creates the matching custody event.
+
+### Application deletes
+
+Only an administrator can delete a case. The API executes:
+
+```sql
+DELETE FROM `case`
+WHERE case_id = ?;
+```
+
+The foreign-key cascade deletes dependent relational data. The API then deletes the corresponding stored media files and writes a MongoDB audit event.
+
+## 23. Query-by-query explanation of `03_queries.sql`
+
+### Query 1 — dashboard view, ordering, and aggregation
+
+```sql
+SELECT *
+FROM v_case_dashboard
+ORDER BY filing_date DESC;
+```
+
+This retrieves the dashboard-ready result and displays newest filings first.
+
+### Query 2 — evidence movement using joins and filtering
+
+```sql
+SELECT e.evidence_code, c.case_number,
+       cl.from_location, cl.to_location,
+       cl.action_date_time
+FROM evidence e
+JOIN `case` c ON c.case_id = e.case_id
+JOIN chain_log cl ON cl.evidence_id = e.evidence_id
+WHERE cl.from_location IS NOT NULL
+  AND cl.from_location <> cl.to_location
+ORDER BY cl.action_date_time DESC;
+```
+
+This identifies custody movements where the evidence changed location.
+
+### Query 3 — scheduled hearings with `GROUP BY` and `HAVING`
+
+```sql
+SELECT c.case_number, c.title,
+       COUNT(h.hearing_id) AS scheduled_hearings
+FROM `case` c
+JOIN hearing h ON h.case_id = c.case_id
+             AND h.status = 'SCHEDULED'
+GROUP BY c.case_id, c.case_number, c.title
+HAVING COUNT(h.hearing_id) >= 1
+ORDER BY MIN(h.hearing_date);
+```
+
+This groups hearings by case, removes groups with no scheduled hearing, and orders cases by their earliest hearing.
+
+### Query 4 — full-text search
+
+```sql
+SELECT document_id, title,
+       MATCH(title, description)
+       AGAINST('+evidence' IN BOOLEAN MODE) AS relevance
+FROM document
+WHERE MATCH(title, description)
+      AGAINST('+evidence' IN BOOLEAN MODE)
+ORDER BY relevance DESC;
+```
+
+The `+` requires the word `evidence`, while the full-text index avoids a slow scan of every document description.
+
+### Query 5 — subquery and average comparison
+
+```sql
+SELECT court_name, case_count
+FROM (
+  SELECT co.court_name, COUNT(c.case_id) AS case_count
+  FROM court co
+  LEFT JOIN `case` c ON c.court_id = co.court_id
+  GROUP BY co.court_id, co.court_name
+) x
+WHERE case_count > (
+  SELECT AVG(case_count)
+  FROM (
+    SELECT COUNT(*) AS case_count
+    FROM `case`
+    GROUP BY court_id
+  ) y
+);
+```
+
+This uses nested subqueries to find courts whose number of cases is above the average case count.
+
+### Useful demonstration commands
+
+```sql
+USE judicial_case_system;
+SHOW TABLES;
+DESCRIBE `case`;
+SHOW CREATE VIEW v_case_dashboard;
+SELECT * FROM v_case_dashboard;
+SELECT * FROM chain_log ORDER BY action_date_time DESC;
+SELECT * FROM docket_entry ORDER BY filed_at DESC;
+```
+
+## 24. MongoDB commands used
+
+The MongoDB setup selects the project database:
+
+```javascript
+db = db.getSiblingDB('judicial_case_system');
+```
+
+It creates indexes for audit-event retrieval:
+
+```javascript
+db.audit_events.createIndex({ eventType: 1, createdAt: -1 });
+db.audit_events.createIndex({ caseId: 1, createdAt: -1 });
+```
+
+It creates indexes for case notes and text search:
+
+```javascript
+db.case_notes.createIndex({ caseId: 1, createdAt: -1 });
+db.case_notes.createIndex({ title: 'text', body: 'text' });
+```
+
+Useful demonstration commands:
+
+```javascript
+use judicial_case_system
+show collections
+db.audit_events.find().sort({ createdAt: -1 }).limit(10)
+db.audit_events.countDocuments()
+db.case_notes.find({ $text: { $search: 'evidence' } })
+```
+
+## 25. Complete application API map
+
+| Method | Route | Purpose | Database effect |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Verify credentials and create session | Reads MySQL; writes Mongo audit |
+| `POST` | `/api/auth/logout` | End session | Clears cookie |
+| `GET` | `/api/cases` | Retrieve dashboard cases | Reads `v_case_dashboard` |
+| `POST` | `/api/cases` | Create case and accused person | MySQL transaction, file write, Mongo audit |
+| `PATCH` | `/api/cases/[caseId]` | Change case status | Updates MySQL; writes Mongo audit |
+| `DELETE` | `/api/cases/[caseId]` | Delete case, admin only | Cascading MySQL delete, media deletion, Mongo audit |
+| `GET` | `/api/evidence` | List evidence | Reads MySQL |
+| `POST` | `/api/evidence` | Register evidence media | MySQL insert, file write, trigger, Mongo audit |
+| `GET` | `/api/evidence/files/[fileName]` | Serve protected evidence media | Reads local storage |
+| `GET` | `/api/accused/photos/[fileName]` | Serve protected accused photo | Reads local storage |
+| `GET/POST` | `/api/admin/users` | Administrative user operations | Reads/writes MySQL with role checks |
+
+## 26. Exact setup and execution commands
+
+### First-time setup
+
+```powershell
+cd "C:\Users\USER\JUDICIAL-CASE-FILING-COURT-DOCKER-AND-LEGAL-CHAIN-OF-CUSTODY-SYSTEM-"
+Copy-Item .env.example .env
+npm.cmd install
+```
+
+Load MySQL schema and seed data only when the database is not already initialized:
+
+```powershell
+mysql -u root -p < db\mysql\01_schema.sql
+mysql -u root -p < db\mysql\02_seed.sql
+mongosh < db\mongo\01_indexes.js
+```
+
+### Every normal run
+
+In Administrator PowerShell:
+
+```powershell
+Start-Service MongoDB
+```
+
+MySQL must be listening on port `3306`:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3306
+```
+
+Then in the project terminal:
+
+```powershell
+cd "C:\Users\USER\JUDICIAL-CASE-FILING-COURT-DOCKER-AND-LEGAL-CHAIN-OF-CUSTODY-SYSTEM-"
+npm.cmd run dev
+```
+
+Open `http://localhost:3000`.
+
+The `npm.cmd` form is useful on Windows when PowerShell execution policy blocks `npm.ps1`.
+
+### Verification commands
+
+```powershell
+Get-Service MongoDB
+Get-NetTCPConnection -LocalPort 3306
+Test-NetConnection 127.0.0.1 -Port 27017
+npm.cmd test
+npm.cmd run build
+```
+
+## 27. Database presentation checklist
+
+For a teacher demonstration, explain the database in this order:
+
+1. MySQL is the primary normalized relational database.
+2. MongoDB is the second paradigm for flexible audit documents and notes.
+3. The `case` table is the central entity.
+4. Foreign keys connect cases to courts, users, accused people, hearings, docket entries, documents, and evidence.
+5. `chain_log` preserves evidence movement history.
+6. `v_case_dashboard` simplifies reporting.
+7. The trigger automatically registers initial custody.
+8. The stored procedure transfers evidence atomically.
+9. Constraints enforce valid roles, statuses, dates, and age.
+10. Indexes improve dashboard, hearing, custody, and full-text search performance.
+11. API operations use parameterized SQL and validation.
+12. MongoDB records who performed important actions and when.
+
+## 28. Short viva answers
+
+**Why did you use two databases?** MySQL is best for structured relationships and transactions; MongoDB is useful for flexible, append-only audit events and notes.
+
+**What is the primary key of the case table?** `case_id`. `case_number` is also unique and is the human-readable case identifier.
+
+**Why is chain of custody a separate table?** One evidence item can move many times, so each movement must be stored as a separate historical row.
+
+**What does the trigger do?** It creates the initial `REGISTERED` custody event automatically whenever evidence is inserted.
+
+**What does the stored procedure do?** It updates the evidence location and inserts the corresponding transfer log inside one transaction.
+
+**How are solved cases identified?** A case is considered solved when its status is `CLOSED`; the solved page filters the dashboard view rather than copying records.
+
+**Who can delete a case?** Only an authenticated administrator. Dependent rows and stored media are removed, and the deletion is audited in MongoDB.
+
+**How are passwords protected?** Passwords are stored as bcrypt hashes and verified on the server. Sessions use signed, HTTP-only cookies.
+
+**What happens if case intake fails halfway through?** The MySQL transaction rolls back, so the case and accused row are not committed as a partial pair.

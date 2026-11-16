@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 
-const mimeByExtension: Record<string,string> = { ".mp3":"audio/mpeg", ".wav":"audio/wav", ".m4a":"audio/mp4", ".mp4":"video/mp4", ".webm":"video/webm", ".mov":"video/quicktime", ".ogg":"audio/ogg" };
+const mimeByExtension: Record<string,string> = { ".jpg":"image/jpeg", ".jpeg":"image/jpeg", ".png":"image/png", ".gif":"image/gif", ".webp":"image/webp", ".mp3":"audio/mpeg", ".wav":"audio/wav", ".m4a":"audio/mp4", ".mp4":"video/mp4", ".webm":"video/webm", ".mov":"video/quicktime", ".ogg":"audio/ogg" };
 
 export async function GET(_request:Request,{params}:{params:Promise<{fileName:string}>}){
   if(!(await getSession()))return NextResponse.json({error:"Unauthorized"},{status:401});

@@ -12,8 +12,8 @@ export async function POST(req:Request){
   if(!s)return NextResponse.json({error:"Unauthorized"},{status:401});
   const form=await req.formData();
   const file=form.get("file");
-  if(!(file instanceof File) || file.size===0)return NextResponse.json({error:"An audio or video file is required"},{status:400});
-  if(!file.type.startsWith("audio/") && !file.type.startsWith("video/"))return NextResponse.json({error:"Only audio and video files are allowed"},{status:400});
+  if(!(file instanceof File) || file.size===0)return NextResponse.json({error:"An image, audio, or video file is required"},{status:400});
+  if(!file.type.startsWith("audio/") && !file.type.startsWith("video/") && !file.type.startsWith("image/"))return NextResponse.json({error:"Only image, audio, and video files are allowed"},{status:400});
   if(file.size>100*1024*1024)return NextResponse.json({error:"Media file must be 100 MB or smaller"},{status:400});
   const fields=Object.fromEntries([...form.entries()].filter(([key])=>key!=="file").map(([key,value])=>[key,String(value)]));
   const parsed=evidenceSchema.safeParse(fields);

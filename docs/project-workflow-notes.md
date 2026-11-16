@@ -206,7 +206,7 @@ When submitted:
 
 1. The browser sends multipart form data to `POST /api/evidence`.
 2. The API checks the session.
-3. The upload must be audio or video.
+3. The upload must be an image, audio, or video file.
 4. The maximum file size is 100 MB.
 5. `evidenceSchema` validates the structured fields.
 6. The file is saved with a generated random name in `storage/evidence`.
@@ -216,7 +216,7 @@ When submitted:
 10. A MongoDB `EVIDENCE_REGISTERED` event records the registration metadata.
 11. The protected route `/api/evidence/files/[fileName]` serves the stored media.
 
-The database stores the evidence metadata and path; the actual media is stored in the local evidence folder.
+The database stores the evidence metadata and path; the actual media is stored in the local evidence folder. Each evidence code now links to an evidence-details page that can preview images, play supported audio/video files, and display the complete custody history.
 
 ## 10. Chain-of-custody workflow
 

@@ -21,9 +21,10 @@ Database design artifacts:
 1. Install Node.js 20+, MySQL 8+, and MongoDB 7+.
 2. Copy `.env.example` to `.env` and set values. Generate a strong `AUTH_SECRET`.
 3. Run `mysql < db/mysql/01_schema.sql` and then `mysql < db/mysql/02_seed.sql`.
-4. Run `mongosh < db/mongo/01_indexes.js`.
-5. Replace the two seed password placeholders with bcrypt hashes. For example, run `node -e "console.log(require('bcryptjs').hashSync('ChangeMe123!', 10))"` after `npm install`.
-6. Run `npm install`, then `npm run dev`, and open `http://localhost:3000`.
+4. For an existing database created before docket support was added, run `mysql < db/mysql/04_migrations.sql`.
+5. Run `mongosh < db/mongo/01_indexes.js`.
+6. Replace the two seed password placeholders with bcrypt hashes. For example, run `node -e "console.log(require('bcryptjs').hashSync('ChangeMe123!', 10))"` after `npm install`.
+7. Run `npm install`, then `npm run dev`, and open `http://localhost:3000`.
 
 The seed accounts are `admin@example.com` and `staff@example.com`; set their passwords only after replacing the placeholder hashes. Never commit `.env` or real credentials.
 
